@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AirCast Delhi — 1 km Real-Time Weather Downscaling</title>
+<meta name="description" content="AirCast Delhi: 3D UNet diffusion-based downscaling of GraphCast weather forecasts to 1 km resolution over Delhi NCT.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg-dark:#0a0a1a;--bg-section:#f8f9fa;--bg-white:#ffffff;
+  --text-primary:#1a1a2e;--text-secondary:#555;--text-light:#fff;
+  --accent:#e74c3c;--accent2:#2980b9;--accent3:#f39c12;
+  --gradient-hero:linear-gradient(135deg,#0a0a1a 0%,#1a1a3e 40%,#2c1a3e 70%,#0a0a1a 100%);
+  --font-body:'Inter',system-ui,-apple-system,sans-serif;
+  --font-display:'Space Grotesk','Inter',sans-serif;
+  --max-w:1100px;
+}
+html{scroll-behavior:smooth;font-size:16px}
+body{font-family:var(--font-body);color:var(--text-primary);background:var(--bg-white);line-height:1.7;overflow-x:hidden}
+
+/* ───── HERO ───── */
+.hero{
+  min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  background:var(--gradient-hero);position:relative;overflow:hidden;text-align:center;padding:2rem;
+}
+.hero::before{
+  content:'';position:absolute;inset:0;
+  background:url('assets/hero_bg.jpg') center/cover no-repeat;
+  opacity:.25;z-index:0;
+}
+.hero-content{position:relative;z-index:1;max-width:900px}
+.hero h1{
+  font-family:var(--font-display);font-size:clamp(2.8rem,7vw,5.5rem);
+  font-weight:800;color:var(--text-light);letter-spacing:-0.03em;
+  line-height:1.05;margin-bottom:.5rem;
+}
+.hero h1 span{
+  background:linear-gradient(90deg,#e74c3c,#f39c12,#e74c3c);
+  background-size:200% auto;
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  background-clip:text;
+  animation:shimmer 4s linear infinite;
+}
+@keyframes shimmer{to{background-position:200% center}}
+.hero .tagline{
+  font-size:clamp(1rem,2.5vw,1.4rem);color:rgba(255,255,255,.75);
+  font-weight:300;margin-bottom:2rem;letter-spacing:.01em;
+}
+.hero .authors{
+  font-size:.95rem;color:rgba(255,255,255,.5);margin-bottom:2.5rem;
+}
+.hero .authors a{color:rgba(255,255,255,.7);text-decoration:none;border-bottom:1px solid rgba(255,255,255,.3)}
+.hero .authors a:hover{color:#fff}
+.hero-badges{display:flex;gap:.8rem;justify-content:center;flex-wrap:wrap;margin-bottom:3rem}
+.badge{
+  display:inline-flex;align-items:center;gap:.4rem;padding:.5rem 1.1rem;
+  border-radius:999px;font-size:.82rem;font-weight:500;
+  border:1px solid rgba(255,255,255,.2);color:rgba(255,255,255,.85);
+  backdrop-filter:blur(8px);background:rgba(255,255,255,.06);
+  transition:all .3s;
+}
+.badge:hover{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.4)}
+.badge svg{width:16px;height:16px;fill:currentColor;opacity:.7}
+.scroll-hint{
+  position:absolute;bottom:2rem;left:50%;transform:translateX(-50%);
+  color:rgba(255,255,255,.4);font-size:.8rem;display:flex;flex-direction:column;align-items:center;gap:.5rem;
+  animation:bob 2s ease-in-out infinite;
+}
+@keyframes bob{0%,100%{transform:translateX(-50%) translateY(0)}50%{transform:translateX(-50%) translateY(8px)}}
+.scroll-hint svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2}
+
+/* ───── SECTIONS ───── */
+section{padding:6rem 2rem}
+.section-dark{background:var(--bg-dark);color:var(--text-light)}
+.section-alt{background:var(--bg-section)}
+.container{max-width:var(--max-w);margin:0 auto}
+.section-label{
+  font-family:var(--font-display);font-size:.75rem;font-weight:600;
+  text-transform:uppercase;letter-spacing:.15em;color:var(--accent);margin-bottom:.5rem;
+}
+.section-dark .section-label{color:var(--accent3)}
+h2{
+  font-family:var(--font-display);font-size:clamp(1.8rem,4vw,2.8rem);
+  font-weight:700;letter-spacing:-0.02em;line-height:1.15;margin-bottom:1.5rem;
+}
+.section-dark h2{color:var(--text-light)}
+.section-subtitle{font-size:1.1rem;color:var(--text-secondary);max-width:700px;margin-bottom:3rem}
+.section-dark .section-subtitle{color:rgba(255,255,255,.6)}
+
+/* Fade-in animation */
+.reveal{opacity:0;transform:translateY(40px);transition:opacity .8s cubic-bezier(.22,1,.36,1),transform .8s cubic-bezier(.22,1,.36,1)}
+.reveal.visible{opacity:1;transform:translateY(0)}
+.reveal-delay-1{transition-delay:.15s}
+.reveal-delay-2{transition-delay:.3s}
+.reveal-delay-3{transition-delay:.45s}
+
+/* ───── CHALLENGE ───── */
+.challenge-grid{display:grid;grid-template-columns:1fr 1fr;gap:3rem;align-items:center}
+.challenge-text p{font-size:1.05rem;color:var(--text-secondary);margin-bottom:1.2rem}
+.challenge-text .highlight{
+  font-size:1.15rem;font-weight:600;color:var(--text-primary);
+  border-left:3px solid var(--accent);padding-left:1rem;margin:1.5rem 0;
+}
+.challenge-visual{
+  display:grid;grid-template-columns:1fr 1fr;gap:1rem;
+}
+.challenge-card{
+  background:var(--bg-dark);border-radius:12px;overflow:hidden;
+  box-shadow:0 8px 32px rgba(0,0,0,.12);
+}
+.challenge-card img{width:100%;display:block}
+.challenge-card .card-label{
+  padding:.6rem 1rem;font-size:.8rem;font-weight:600;color:rgba(255,255,255,.8);
+  text-align:center;font-family:var(--font-display);letter-spacing:.05em;
+}
+.res-badge{
+  display:inline-block;padding:.2rem .6rem;border-radius:4px;font-size:.7rem;
+  font-weight:600;margin-left:.5rem;
+}
+.res-badge.coarse{background:rgba(231,76,60,.3);color:#e74c3c}
+.res-badge.fine{background:rgba(46,204,113,.3);color:#2ecc71}
+
+/* ───── METHOD PIPELINE ───── */
+.pipeline{display:flex;align-items:center;justify-content:center;gap:0;flex-wrap:wrap;margin:2rem 0}
+.pipeline-step{
+  background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);
+  border-radius:16px;padding:1.8rem 1.5rem;text-align:center;
+  min-width:180px;max-width:220px;flex:1;transition:all .3s;
+}
+.pipeline-step:hover{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.3);transform:translateY(-4px)}
+.pipeline-step .step-icon{font-size:2rem;margin-bottom:.8rem;display:block}
+.pipeline-step h3{
+  font-family:var(--font-display);font-size:1rem;font-weight:600;
+  color:var(--text-light);margin-bottom:.4rem;
+}
+.pipeline-step p{font-size:.8rem;color:rgba(255,255,255,.5);line-height:1.4}
+.pipeline-arrow{
+  font-size:1.5rem;color:rgba(255,255,255,.3);padding:0 .5rem;flex-shrink:0;
+}
+
+/* ───── ANIMATION PLAYER ───── */
+.player-container{
+  max-width:800px;margin:0 auto;background:var(--bg-dark);
+  border-radius:16px;overflow:hidden;box-shadow:0 12px 48px rgba(0,0,0,.15);
+}
+.player-display{position:relative;aspect-ratio:7/6.5;overflow:hidden;background:#0a0a1a}
+.player-display img{
+  position:absolute;inset:0;width:100%;height:100%;object-fit:contain;
+  opacity:0;transition:opacity .5s ease;
+}
+.player-display img.active{opacity:1}
+.player-controls{
+  display:flex;align-items:center;gap:1rem;padding:1rem 1.5rem;
+  background:rgba(255,255,255,.04);border-top:1px solid rgba(255,255,255,.08);
+}
+.btn-play{
+  width:40px;height:40px;border-radius:50%;border:none;
+  background:var(--accent);color:#fff;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:all .2s;flex-shrink:0;
+}
+.btn-play:hover{background:#c0392b;transform:scale(1.08)}
+.btn-play svg{width:18px;height:18px;fill:currentColor}
+.player-scrubber{
+  flex:1;-webkit-appearance:none;appearance:none;height:4px;
+  background:rgba(255,255,255,.15);border-radius:2px;outline:none;cursor:pointer;
+}
+.player-scrubber::-webkit-slider-thumb{
+  -webkit-appearance:none;width:14px;height:14px;border-radius:50%;
+  background:var(--accent);cursor:pointer;border:2px solid #fff;
+}
+.player-scrubber::-moz-range-thumb{
+  width:14px;height:14px;border-radius:50%;
+  background:var(--accent);cursor:pointer;border:2px solid #fff;
+}
+.player-time{
+  font-family:var(--font-display);font-size:.85rem;color:rgba(255,255,255,.7);
+  min-width:160px;text-align:right;white-space:nowrap;
+}
+
+/* ───── COMPARISON SLIDER ───── */
+.comparison-wrapper{max-width:800px;margin:0 auto}
+.comparison-container{
+  position:relative;overflow:hidden;border-radius:16px;
+  aspect-ratio:1/1;cursor:col-resize;
+  box-shadow:0 12px 48px rgba(0,0,0,.15);background:var(--bg-dark);
+}
+.comparison-container img{
+  position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain;
+  pointer-events:none;
+}
+.comparison-container .img-after{clip-path:inset(0 0 0 50%)}
+.comparison-handle{
+  position:absolute;top:0;bottom:0;left:50%;width:4px;
+  background:rgba(255,255,255,.9);z-index:10;transform:translateX(-50%);
+  pointer-events:none;
+}
+.comparison-handle::before,.comparison-handle::after{
+  content:'';position:absolute;left:50%;transform:translateX(-50%);
+  width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.95);
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 2px 12px rgba(0,0,0,.3);
+}
+.comparison-handle::before{top:50%;margin-top:-18px}
+.comparison-handle-arrows{
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  z-index:11;pointer-events:none;color:#333;font-size:14px;font-weight:700;
+  display:flex;align-items:center;gap:2px;
+}
+.comp-label{
+  position:absolute;bottom:1rem;padding:.4rem 1rem;border-radius:8px;
+  font-family:var(--font-display);font-size:.85rem;font-weight:600;
+  color:#fff;z-index:5;backdrop-filter:blur(8px);
+}
+.comp-label.left{left:1rem;background:rgba(231,76,60,.7)}
+.comp-label.right{right:1rem;background:rgba(46,204,113,.7)}
+
+/* ───── VALIDATION ───── */
+.validation-img{
+  max-width:900px;margin:0 auto;border-radius:16px;overflow:hidden;
+  box-shadow:0 12px 48px rgba(0,0,0,.15);
+}
+.validation-img img{width:100%;display:block}
+
+/* ───── SPECS ───── */
+.specs-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1.5rem}
+.spec-card{
+  background:var(--bg-white);border-radius:12px;padding:1.5rem;
+  border:1px solid #e8e8e8;transition:all .3s;
+}
+.spec-card:hover{border-color:var(--accent);box-shadow:0 4px 20px rgba(231,76,60,.08);transform:translateY(-2px)}
+.spec-card .spec-value{
+  font-family:var(--font-display);font-size:1.8rem;font-weight:700;
+  color:var(--accent);margin-bottom:.3rem;
+}
+.spec-card .spec-label{font-size:.85rem;color:var(--text-secondary);font-weight:500}
+.spec-card .spec-detail{font-size:.78rem;color:#999;margin-top:.3rem}
+
+/* ───── ARCHITECTURE ───── */
+.arch-diagram{
+  max-width:900px;margin:2rem auto;background:rgba(255,255,255,.04);
+  border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:2.5rem;
+}
+.arch-flow{display:flex;align-items:center;justify-content:center;gap:.3rem;flex-wrap:wrap}
+.arch-block{
+  padding:1rem 1.2rem;border-radius:10px;text-align:center;
+  font-family:var(--font-display);font-size:.85rem;font-weight:600;
+  min-width:120px;
+}
+.arch-block.input{background:rgba(41,128,185,.25);color:#85c1e9;border:1px solid rgba(41,128,185,.4)}
+.arch-block.process{background:rgba(231,76,60,.2);color:#f1948a;border:1px solid rgba(231,76,60,.4)}
+.arch-block.output{background:rgba(46,204,113,.2);color:#82e0aa;border:1px solid rgba(46,204,113,.4)}
+.arch-block small{display:block;font-size:.7rem;font-weight:400;opacity:.7;margin-top:.2rem}
+.arch-arrow{color:rgba(255,255,255,.3);font-size:1.2rem;flex-shrink:0}
+
+/* ───── FOOTER ───── */
+footer{
+  background:var(--bg-dark);color:rgba(255,255,255,.5);
+  padding:3rem 2rem;text-align:center;font-size:.85rem;
+  border-top:1px solid rgba(255,255,255,.08);
+}
+footer a{color:rgba(255,255,255,.7);text-decoration:none;border-bottom:1px solid rgba(255,255,255,.2)}
+footer a:hover{color:#fff}
+footer .footer-links{display:flex;gap:2rem;justify-content:center;margin-bottom:1rem;flex-wrap:wrap}
+
+/* ───── RESPONSIVE ───── */
+@media(max-width:768px){
+  .challenge-grid{grid-template-columns:1fr;gap:2rem}
+  .challenge-visual{grid-template-columns:1fr}
+  .pipeline{flex-direction:column;gap:1rem}
+  .pipeline-arrow{transform:rotate(90deg)}
+  .specs-grid{grid-template-columns:1fr 1fr}
+  .arch-flow{flex-direction:column}
+  .arch-arrow{transform:rotate(90deg)}
+  section{padding:4rem 1.5rem}
+  .player-controls{flex-wrap:wrap}
+  .player-time{min-width:auto;text-align:center;width:100%;order:3}
+}
+</style>
+</head>
+<body>
+
+<!-- ════════ HERO ════════ -->
+<section class="hero">
+  <div class="hero-content">
+    <h1><span>AirCast Delhi</span></h1>
+    <p class="tagline">1 km Real-Time Weather Downscaling for India's Capital</p>
+    <p class="authors">
+      <a href="https://github.com/manmeet3591" target="_blank">Manmeet Singh</a> &nbsp;·&nbsp;
+      AI Research Lab, Western Kentucky University
+    </p>
+    <div class="hero-badges">
+      <span class="badge">
+        <svg viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+        Code
+      </span>
+      <span class="badge">3D UNet + Diffusion</span>
+      <span class="badge">GraphCast Forcing</span>
+      <span class="badge">Q-Q Bias Correction</span>
+    </div>
+  </div>
+  <div class="scroll-hint">
+    <span>Scroll to explore</span>
+    <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+  </div>
+</section>
+
+<!-- ════════ THE CHALLENGE ════════ -->
+<section class="section-alt" id="challenge">
+  <div class="container">
+    <div class="challenge-grid">
+      <div class="challenge-text reveal">
+        <p class="section-label">The Challenge</p>
+        <h2>Global models can't see cities</h2>
+        <p>State-of-the-art AI weather models like <strong>GraphCast</strong> produce forecasts at ~25 km resolution — enough to track synoptic weather systems, but far too coarse for urban decision-making.</p>
+        <p class="highlight">Delhi NCT is just 1,484 km². At 25 km resolution, the entire megacity fits inside 3 grid cells.</p>
+        <p>AirCast Delhi bridges this gap by downscaling GraphCast predictions to <strong>1 km resolution</strong> using a 3D UNet with diffusion-based denoising — revealing neighborhood-scale temperature gradients, urban heat islands, and local circulation patterns invisible to global models.</p>
+      </div>
+      <div class="challenge-visual reveal reveal-delay-1">
+        <div class="challenge-card">
+          <img src="assets/compare_coarse.jpg" alt="GraphCast 25km resolution" loading="lazy">
+          <div class="card-label">Input <span class="res-badge coarse">~25 km</span></div>
+        </div>
+        <div class="challenge-card">
+          <img src="assets/compare_fine.jpg" alt="AirCast Delhi 1km resolution" loading="lazy">
+          <div class="card-label">Output <span class="res-badge fine">1 km</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════ METHOD ════════ -->
+<section class="section-dark" id="method">
+  <div class="container" style="text-align:center">
+    <p class="section-label reveal">Method</p>
+    <h2 class="reveal">Three-stage downscaling pipeline</h2>
+    <p class="section-subtitle reveal" style="margin-left:auto;margin-right:auto">
+      From global AI forecast to street-level weather intelligence in seconds.
+    </p>
+    <div class="pipeline reveal reveal-delay-1">
+      <div class="pipeline-step">
+        <span class="step-icon">🌐</span>
+        <h3>GraphCast</h3>
+        <p>Google DeepMind's global AI weather model provides 0.25° forcing fields</p>
+      </div>
+      <span class="pipeline-arrow">→</span>
+      <div class="pipeline-step">
+        <span class="step-icon">🧠</span>
+        <h3>3D UNet + Diffusion</h3>
+        <p>Denoising diffusion with 25 steps, conditioned on topography and sky-view factor</p>
+      </div>
+      <span class="pipeline-arrow">→</span>
+      <div class="pipeline-step">
+        <span class="step-icon">📐</span>
+        <h3>Q-Q Bias Correction</h3>
+        <p>Quantile-quantile mapping against Safdarjung & Palam GHCN-H stations</p>
+      </div>
+      <span class="pipeline-arrow">→</span>
+      <div class="pipeline-step">
+        <span class="step-icon">🗺️</span>
+        <h3>1 km Forecast</h3>
+        <p>72×78 grid at 0.01° spacing, 8 surface variables, hourly output</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════ ARCHITECTURE ════════ -->
+<section class="section-dark" id="architecture" style="padding-top:0">
+  <div class="container" style="text-align:center">
+    <div class="arch-diagram reveal">
+      <p style="font-family:var(--font-display);font-size:.9rem;font-weight:600;color:rgba(255,255,255,.7);margin-bottom:1.5rem;text-transform:uppercase;letter-spacing:.1em">Model Architecture</p>
+      <div class="arch-flow">
+        <div class="arch-block input">GraphCast<small>0.25° global</small></div>
+        <span class="arch-arrow">→</span>
+        <div class="arch-block input">Topography<small>SRTM 90m</small></div>
+        <span class="arch-arrow">→</span>
+        <div class="arch-block input">Sky-View Factor<small>SVF grid</small></div>
+        <span class="arch-arrow">→</span>
+        <div class="arch-block process">3D UNet<small>Encoder–Decoder</small></div>
+        <span class="arch-arrow">→</span>
+        <div class="arch-block process">DDPM<small>25-step denoise</small></div>
+        <span class="arch-arrow">→</span>
+        <div class="arch-block process">Spline Blend<small>75% overlap tiles</small></div>
+        <span class="arch-arrow">→</span>
+        <div class="arch-block output">1 km Output<small>8 variables</small></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════ SPATIAL EVOLUTION ════════ -->
+<section id="results">
+  <div class="container" style="text-align:center">
+    <p class="section-label reveal">Results</p>
+    <h2 class="reveal">24-hour temperature evolution over Delhi</h2>
+    <p class="section-subtitle reveal" style="margin-left:auto;margin-right:auto">
+      Watch the diurnal heating cycle unfold at 1 km resolution. Forecast initialized 14 June 2026, 00Z.
+    </p>
+    <div class="player-container reveal reveal-delay-1">
+      <div class="player-display" id="playerDisplay"></div>
+      <div class="player-controls">
+        <button class="btn-play" id="btnPlay" aria-label="Play/Pause">
+          <svg id="iconPlay" viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21"/></svg>
+          <svg id="iconPause" viewBox="0 0 24 24" style="display:none"><rect x="5" y="3" width="4" height="18"/><rect x="15" y="3" width="4" height="18"/></svg>
+        </button>
+        <input type="range" class="player-scrubber" id="scrubber" min="0" max="23" value="0" step="1">
+        <span class="player-time" id="playerTime">Loading...</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════ COMPARISON SLIDER ════════ -->
+<section class="section-alt" id="comparison">
+  <div class="container" style="text-align:center">
+    <p class="section-label reveal">Resolution Comparison</p>
+    <h2 class="reveal">25× resolution enhancement</h2>
+    <p class="section-subtitle reveal" style="margin-left:auto;margin-right:auto">
+      Drag the slider to compare GraphCast input (~25 km) with AirCast Delhi output (1 km) at peak afternoon heating.
+    </p>
+    <div class="comparison-wrapper reveal reveal-delay-1">
+      <div class="comparison-container" id="comparisonSlider">
+        <img src="assets/compare_coarse.jpg" alt="GraphCast 25km" class="img-before">
+        <img src="assets/compare_fine.jpg" alt="AirCast Delhi 1km" class="img-after">
+        <div class="comparison-handle" id="compHandle"></div>
+        <div class="comparison-handle-arrows" id="compArrows">◀ ▶</div>
+        <span class="comp-label left">GraphCast ~25 km</span>
+        <span class="comp-label right">AirCast Delhi 1 km</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════ VALIDATION ════════ -->
+<section id="validation">
+  <div class="container" style="text-align:center">
+    <p class="section-label reveal">Validation</p>
+    <h2 class="reveal">Station-level forecast accuracy</h2>
+    <p class="section-subtitle reveal" style="margin-left:auto;margin-right:auto">
+      3-day temperature forecast at Safdarjung station (28.58°N, 77.21°E), showing clear diurnal cycles with peaks above 45°C during the pre-monsoon heatwave.
+    </p>
+    <div class="validation-img reveal reveal-delay-1">
+      <img src="assets/timeseries.png" alt="Temperature forecast timeseries at Safdarjung" loading="lazy">
+    </div>
+  </div>
+</section>
+
+<!-- ════════ TECHNICAL SPECS ════════ -->
+<section class="section-alt" id="specs">
+  <div class="container">
+    <p class="section-label reveal">Technical Specifications</p>
+    <h2 class="reveal">Under the hood</h2>
+    <div class="specs-grid">
+      <div class="spec-card reveal">
+        <div class="spec-value">1 km</div>
+        <div class="spec-label">Spatial Resolution</div>
+        <div class="spec-detail">0.01° grid spacing (~1.1 km at 28°N)</div>
+      </div>
+      <div class="spec-card reveal reveal-delay-1">
+        <div class="spec-value">72 × 78</div>
+        <div class="spec-label">Grid Dimensions</div>
+        <div class="spec-detail">5,616 grid points per variable per timestep</div>
+      </div>
+      <div class="spec-card reveal reveal-delay-1">
+        <div class="spec-value">8</div>
+        <div class="spec-label">Output Variables</div>
+        <div class="spec-detail">T2M, U10M, V10M, PRATE, SLP, RH2M, PSFC, Q2M</div>
+      </div>
+      <div class="spec-card reveal reveal-delay-2">
+        <div class="spec-value">25</div>
+        <div class="spec-label">Diffusion Steps</div>
+        <div class="spec-detail">DDPM denoising for high-fidelity generation</div>
+      </div>
+      <div class="spec-card reveal reveal-delay-2">
+        <div class="spec-value">75%</div>
+        <div class="spec-label">Tile Overlap</div>
+        <div class="spec-detail">Hermite spline blending eliminates boundary artifacts</div>
+      </div>
+      <div class="spec-card reveal reveal-delay-3">
+        <div class="spec-value">67 h</div>
+        <div class="spec-label">Forecast Horizon</div>
+        <div class="spec-detail">~3-day lead time from GraphCast initialization</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════ FOOTER ════════ -->
+<footer>
+  <div class="footer-links">
+    <a href="https://github.com/manmeet3591/aircast_delhi_demo" target="_blank">GitHub Repository</a>
+    <a href="https://github.com/manmeet3591" target="_blank">Author</a>
+  </div>
+  <p>&copy; 2026 AirCast Delhi &nbsp;·&nbsp; AI Research Lab, Western Kentucky University</p>
+</footer>
+
+<script>
+/* ───── Scroll Reveal ───── */
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); observer.unobserve(e.target); } });
+}, { threshold: 0.15, rootMargin: '0px 0px -40px 0px' });
+document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+/* ───── Animation Player ───── */
+const TOTAL_FRAMES = 24;
+let currentFrame = 0, playing = false, interval = null;
+const display = document.getElementById('playerDisplay');
+const scrubber = document.getElementById('scrubber');
+const timeLabel = document.getElementById('playerTime');
+const btnPlay = document.getElementById('btnPlay');
+const iconPlay = document.getElementById('iconPlay');
+const iconPause = document.getElementById('iconPause');
+let frameLabels = [];
+
+const imgs = [];
+for (let i = 0; i < TOTAL_FRAMES; i++) {
+  const img = new Image();
+  img.src = `assets/frames/frame_${String(i).padStart(2,'0')}.jpg`;
+  img.alt = `Frame ${i}`;
+  if (i === 0) img.classList.add('active');
+  display.appendChild(img);
+  imgs.push(img);
+}
+
+fetch('assets/frame_labels.json').then(r => r.json()).then(labels => {
+  frameLabels = labels;
+  updateTime();
+}).catch(() => {
+  for (let i = 0; i < TOTAL_FRAMES; i++) frameLabels.push(`Frame ${i}`);
+  updateTime();
+});
+
+function showFrame(idx) {
+  imgs.forEach((img, i) => img.classList.toggle('active', i === idx));
+  currentFrame = idx;
+  scrubber.value = idx;
+  updateTime();
+}
+function updateTime() {
+  if (frameLabels.length) timeLabel.textContent = frameLabels[currentFrame] || '';
+}
+function togglePlay() {
+  playing = !playing;
+  iconPlay.style.display = playing ? 'none' : 'block';
+  iconPause.style.display = playing ? 'block' : 'none';
+  if (playing) {
+    interval = setInterval(() => {
+      showFrame((currentFrame + 1) % TOTAL_FRAMES);
+    }, 600);
+  } else {
+    clearInterval(interval);
+  }
+}
+btnPlay.addEventListener('click', togglePlay);
+scrubber.addEventListener('input', () => {
+  showFrame(parseInt(scrubber.value));
+  if (playing) { clearInterval(interval); playing = false; iconPlay.style.display='block'; iconPause.style.display='none'; }
+});
+
+/* ───── Comparison Slider ───── */
+const comp = document.getElementById('comparisonSlider');
+const handle = document.getElementById('compHandle');
+const arrows = document.getElementById('compArrows');
+const imgAfter = comp.querySelector('.img-after');
+let dragging = false;
+
+function setPosition(x) {
+  const rect = comp.getBoundingClientRect();
+  let pct = ((x - rect.left) / rect.width) * 100;
+  pct = Math.max(2, Math.min(98, pct));
+  handle.style.left = pct + '%';
+  arrows.style.left = pct + '%';
+  imgAfter.style.clipPath = `inset(0 0 0 ${pct}%)`;
+}
+comp.addEventListener('mousedown', (e) => { dragging = true; setPosition(e.clientX); });
+comp.addEventListener('touchstart', (e) => { dragging = true; setPosition(e.touches[0].clientX); }, {passive:true});
+window.addEventListener('mousemove', (e) => { if (dragging) setPosition(e.clientX); });
+window.addEventListener('touchmove', (e) => { if (dragging) setPosition(e.touches[0].clientX); }, {passive:true});
+window.addEventListener('mouseup', () => dragging = false);
+window.addEventListener('touchend', () => dragging = false);
+</script>
+</body>
+</html>
