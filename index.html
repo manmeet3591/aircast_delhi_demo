@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AirCast Delhi — 1 km Real-Time Weather Downscaling</title>
-<meta name="description" content="AirCast Delhi: 3D UNet diffusion-based downscaling of GraphCast weather forecasts to 1 km resolution over Delhi NCT.">
+<meta name="description" content="AirCast Delhi: 3D UNet + LCM diffusion-based downscaling of GraphCast weather forecasts to 1 km resolution over Delhi NCT.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -290,17 +290,17 @@ footer .footer-links{display:flex;gap:2rem;justify-content:center;margin-bottom:
     <h1><span>AirCast Delhi</span></h1>
     <p class="tagline">1 km Real-Time Weather Downscaling for India's Capital</p>
     <p class="authors">
-      <a href="https://github.com/manmeet3591" target="_blank">Manmeet Singh</a> &nbsp;·&nbsp;
-      AI Research Lab, Western Kentucky University
+      Manmeet Singh, Saptarishi Dhanuka, Sandeep Juneja<br>
+      <a href="https://www.wku.edu" target="_blank">Western Kentucky University</a> &nbsp;&amp;&nbsp;
+      <a href="https://www.ashoka.edu.in" target="_blank">Ashoka University</a>
     </p>
     <div class="hero-badges">
       <span class="badge">
         <svg viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
         Code
       </span>
-      <span class="badge">3D UNet + Diffusion</span>
+      <span class="badge">3D UNet + LCM Diffusion</span>
       <span class="badge">GraphCast Forcing</span>
-      <span class="badge">Q-Q Bias Correction</span>
     </div>
   </div>
   <div class="scroll-hint">
@@ -318,7 +318,7 @@ footer .footer-links{display:flex;gap:2rem;justify-content:center;margin-bottom:
         <h2>Global models can't see cities</h2>
         <p>State-of-the-art AI weather models like <strong>GraphCast</strong> produce forecasts at ~25 km resolution — enough to track synoptic weather systems, but far too coarse for urban decision-making.</p>
         <p class="highlight">Delhi NCT is just 1,484 km². At 25 km resolution, the entire megacity fits inside 3 grid cells.</p>
-        <p>AirCast Delhi bridges this gap by downscaling GraphCast predictions to <strong>1 km resolution</strong> using a 3D UNet with diffusion-based denoising — revealing neighborhood-scale temperature gradients, urban heat islands, and local circulation patterns invisible to global models.</p>
+        <p>AirCast Delhi bridges this gap by downscaling GraphCast predictions to <strong>1 km resolution</strong> using a 3D UNet with Latent Consistency Model (LCM) diffusion — revealing neighborhood-scale temperature gradients, urban heat islands, and local circulation patterns invisible to global models.</p>
       </div>
       <div class="challenge-visual reveal reveal-delay-1">
         <div class="challenge-card">
@@ -351,20 +351,14 @@ footer .footer-links{display:flex;gap:2rem;justify-content:center;margin-bottom:
       <span class="pipeline-arrow">→</span>
       <div class="pipeline-step">
         <span class="step-icon">🧠</span>
-        <h3>3D UNet + Diffusion</h3>
-        <p>Denoising diffusion with 25 steps, conditioned on topography and sky-view factor</p>
-      </div>
-      <span class="pipeline-arrow">→</span>
-      <div class="pipeline-step">
-        <span class="step-icon">📐</span>
-        <h3>Q-Q Bias Correction</h3>
-        <p>Quantile-quantile mapping against Safdarjung & Palam GHCN-H stations</p>
+        <h3>3D UNet + LCM</h3>
+        <p>Latent Consistency Model diffusion, conditioned on topography and sky-view factor</p>
       </div>
       <span class="pipeline-arrow">→</span>
       <div class="pipeline-step">
         <span class="step-icon">🗺️</span>
         <h3>1 km Forecast</h3>
-        <p>72×78 grid at 0.01° spacing, 8 surface variables, hourly output</p>
+        <p>High-resolution grid at 0.01° spacing, 8 surface variables, hourly output</p>
       </div>
     </div>
   </div>
@@ -384,7 +378,7 @@ footer .footer-links{display:flex;gap:2rem;justify-content:center;margin-bottom:
         <span class="arch-arrow">→</span>
         <div class="arch-block process">3D UNet<small>Encoder–Decoder</small></div>
         <span class="arch-arrow">→</span>
-        <div class="arch-block process">DDPM<small>25-step denoise</small></div>
+        <div class="arch-block process">LCM<small>Consistency distill</small></div>
         <span class="arch-arrow">→</span>
         <div class="arch-block process">Spline Blend<small>75% overlap tiles</small></div>
         <span class="arch-arrow">→</span>
@@ -443,7 +437,7 @@ footer .footer-links{display:flex;gap:2rem;justify-content:center;margin-bottom:
     <p class="section-label reveal">Validation</p>
     <h2 class="reveal">Station-level forecast accuracy</h2>
     <p class="section-subtitle reveal" style="margin-left:auto;margin-right:auto">
-      3-day temperature forecast at Safdarjung station (28.58°N, 77.21°E), showing clear diurnal cycles with peaks above 45°C during the pre-monsoon heatwave.
+      AirCast Delhi forecast vs. GHCN-H ground truth observations at Safdarjung station (28.58°N, 77.21°E) during the May 2024 heatwave, showing strong agreement on diurnal cycles and peak temperatures above 45°C.
     </p>
     <div class="validation-img reveal reveal-delay-1">
       <img src="assets/timeseries.png" alt="Temperature forecast timeseries at Safdarjung" loading="lazy">
@@ -465,7 +459,7 @@ footer .footer-links{display:flex;gap:2rem;justify-content:center;margin-bottom:
       <div class="spec-card reveal reveal-delay-1">
         <div class="spec-value">72 × 78</div>
         <div class="spec-label">Grid Dimensions</div>
-        <div class="spec-detail">5,616 grid points per variable per timestep</div>
+        <div class="spec-detail">72 latitude × 78 longitude points covering Delhi NCT</div>
       </div>
       <div class="spec-card reveal reveal-delay-1">
         <div class="spec-value">8</div>
@@ -473,9 +467,9 @@ footer .footer-links{display:flex;gap:2rem;justify-content:center;margin-bottom:
         <div class="spec-detail">T2M, U10M, V10M, PRATE, SLP, RH2M, PSFC, Q2M</div>
       </div>
       <div class="spec-card reveal reveal-delay-2">
-        <div class="spec-value">25</div>
-        <div class="spec-label">Diffusion Steps</div>
-        <div class="spec-detail">DDPM denoising for high-fidelity generation</div>
+        <div class="spec-value">LCM</div>
+        <div class="spec-label">Diffusion Model</div>
+        <div class="spec-detail">Latent Consistency Model for fast, high-fidelity generation</div>
       </div>
       <div class="spec-card reveal reveal-delay-2">
         <div class="spec-value">75%</div>
@@ -497,7 +491,7 @@ footer .footer-links{display:flex;gap:2rem;justify-content:center;margin-bottom:
     <a href="https://github.com/manmeet3591/aircast_delhi_demo" target="_blank">GitHub Repository</a>
     <a href="https://github.com/manmeet3591" target="_blank">Author</a>
   </div>
-  <p>&copy; 2026 AirCast Delhi &nbsp;·&nbsp; AI Research Lab, Western Kentucky University</p>
+  <p>&copy; 2026 AirCast Delhi &nbsp;·&nbsp; Western Kentucky University &amp; Ashoka University</p>
 </footer>
 
 <script>
